@@ -10,6 +10,23 @@
  #include <IRremote.h>
  #include <LiquidCrystal.h>
  #include <string.h>
+ //Define statements
+ /*IR control codes*/
+ #define UP 0xff629d
+ #define DOWN 0xffa857
+ #define LEFT 0xff22dd
+ #define RIGHT 0xffc23d
+ #define ENTER 0xff02fd
+ #define ZERO 0xff6897
+ #define ONE 0xff30cf
+ #define TWO 0xff18e7
+ #define THREE 0xff7a85
+ #define FOUR 0xff10ef
+ #define FIVE 0xff38c7
+ #define SIX 0xff5aa5
+ #define SEVEN 0xff42bd
+ #define EIGHT 0xff4ab5
+ #define NINE 0xff52ad
 //PWM Pins
   const int redPin = 11; 																	//Red Pin
   const int greenPin = 10;																	//Green Pin
@@ -21,17 +38,19 @@
   const int irR = 2;																		//IR Recieve Pin
   IRrecv irrecv(irR);																		//Create IR device
   decode_results results;																	//Create results variable. This is used to extract IR code
+
 //State Machine
   bool machStart = true;																	//State Machine startup variable, to be used later
   bool irRECV = false;																		//IR interrupt flag, to be used later
-  enum STATE {st_IDLE, st_RECV, st_ONE, st_TWO, st_THREE, st_FOUR, st_FIVE, st_SIX};		//State machine state declerations
+  bool modeSet = false; 																	//Flag for startup
+  enum STATE {st_IDLE, st_RECV, st_ONE, st_TWO, st_THREE, st_FOUR, st_FIVE, st_SIX, st_setMode};		//State machine state declerations
   u32 store;																				//IR code storage variable, used for state machine state change
   u32 machStr;																				//State machine IR code comparasion variable, used for detecting change
   STATE currentState;																		//Current State variable, used to control the state machine
   int lightMode = 0;																		//Light Mode variable, used to control the lightControl subroutine
 //PWM Vals
   int curR, curG, curB;
-  
+
 
 //Begin
 void setup() {
@@ -90,37 +109,56 @@ void stateMachine(){
   u32 code;
   switch(currentState){
     case st_IDLE:
-      if(machStr != store){
+		if(modeSet == false){
+			currentState = st_setMode;
+			break;
+		}
+		if(machStr != store){
         
-        machStr = store;
-        Serial.println("CODE RECIEVED");
-        currentState = st_RECV;
-      }
+			machStr = store;
+			Serial.println("CODE RECIEVED");
+			currentState = st_setMode;
+		}
       ir();
       lightControl(lightMode);
       break;
+	case st_setMode:
+		modeSet = true;
+		lcd.print("Select Mode");
+		lcd.setCursor(0,1);
+		lcd.blink();
+		ir();
+		if(machStr != store){
+        
+			machStr = store;
+			Serial.println("CODE RECIEVED");
+			
+			currentState = st_RECV;
+		}
+		currentState = st_IDLE;
+		break;
     case st_RECV:
-      if(store == 0xFF30CF){
+      if(store == ONE){
         Serial.println("CHANGE");
         currentState = st_ONE;
       }
-      else if(store == 0xFF18e7){
+      else if(store == TWO){
         Serial.println("CHANGE");
         currentState = st_TWO;
       }
-      else if(store == 0xFF7a85){
+      else if(store == THREE){
         Serial.println("CHANGE");
         currentState = st_THREE;
       }
-      else if(store == 0xFF10ef){
+      else if(store == FOUR){
         Serial.println("CHANGE");
         currentState = st_FOUR;
       }
-      else if(store == 0xFF38c7){
+      else if(store == FIVE){
         Serial.println("CHANGE");
         currentState = st_FIVE;
       }
-      else if(store == 0xFF5aa5){
+      else if(store == SIX){
         Serial.println("CHANGE");
         currentState = st_SIX;
       }
