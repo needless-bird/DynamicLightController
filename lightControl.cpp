@@ -28,26 +28,26 @@
  #define EIGHT 0xff4ab5
  #define NINE 0xff52ad
 //PWM Pins
-  const int redPin = 11; 																	//Red Pin
-  const int greenPin = 10;																	//Green Pin
-  const int bluePin = 9;																	//Blue Pin
+  const int redPin = 11;                                   //Red Pin
+  const int greenPin = 10;                                  //Green Pin
+  const int bluePin = 9;                                  //Blue Pin
 //LCD
-  const int rs = 3, en = 8, d4 = 7, d5 = 6, d6 = 5, d7 = 4;									//LCD Pin definitions. 
-  LiquidCrystal lcd(rs, en, d4, d5, d6, d7);												//Creates LCD device
+  const int rs = 3, en = 8, d4 = 7, d5 = 6, d6 = 5, d7 = 4;                 //LCD Pin definitions. 
+  LiquidCrystal lcd(rs, en, d4, d5, d6, d7);                        //Creates LCD device
 //ir 
-  const int irR = 2;																		//IR Recieve Pin
-  IRrecv irrecv(irR);																		//Create IR device
-  decode_results results;																	//Create results variable. This is used to extract IR code
+  const int irR = 2;                                    //IR Recieve Pin
+  IRrecv irrecv(irR);                                   //Create IR device
+  decode_results results;                                 //Create results variable. This is used to extract IR code
 
 //State Machine
-  bool machStart = true;																	//State Machine startup variable, to be used later
-  bool irRECV = false;																		//IR interrupt flag, to be used later
-  bool modeSet = false; 																	//Flag for startup
-  enum STATE {st_IDLE, st_RECV, st_ONE, st_TWO, st_THREE, st_FOUR, st_FIVE, st_SIX, st_setMode};		//State machine state declerations
-  u32 store;																				//IR code storage variable, used for state machine state change
-  u32 machStr;																				//State machine IR code comparasion variable, used for detecting change
-  STATE currentState;																		//Current State variable, used to control the state machine
-  int lightMode = 0;																		//Light Mode variable, used to control the lightControl subroutine
+  bool machStart = true;                                  //State Machine startup variable, to be used later
+  bool irRECV = false;                                    //IR interrupt flag, to be used later
+  bool modeSet = false;                                   //Flag for startup
+  enum STATE {st_IDLE, st_RECV, st_ONE, st_TWO, st_THREE, st_FOUR, st_FIVE, st_SIX, st_setMode};    //State machine state declerations
+  u32 store;                                        //IR code storage variable, used for state machine state change
+  u32 machStr;                                        //State machine IR code comparasion variable, used for detecting change
+  STATE currentState;                                   //Current State variable, used to control the state machine
+  int lightMode = 0;                                    //Light Mode variable, used to control the lightControl subroutine
 //PWM Vals
   int curR, curG, curB;
 
@@ -56,23 +56,24 @@
 void setup() {
   
   //initialize pins
-  setColourRgb(0,0,0);																		//Initialize the RGB LED to off
-  Serial.begin(9600);																		//Initialize serial connection
-  irrecv.enableIRIn();																		//enable the IR device
-  irrecv.blink13(true);																		//turn on IR blink 
+  setColourRgb(0,0,0);                                    //Initialize the RGB LED to off
+  Serial.begin(9600);                                   //Initialize serial connection
+  irrecv.enableIRIn();                                    //enable the IR device
+  irrecv.blink13(true);                                   //turn on IR blink 
   // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);																			//Initialize the LCD device
+  lcd.begin(16, 2);                                     //Initialize the LCD device
   // Print a message to the LCD.
-  lcd.print("Welcome");																		//Print a welcome message when setup is complete
+  lcd.print("Welcome");                                   //Print a welcome message when setup is complete
   lcd.setCursor(0,1);
   lcd.print("Setup Complete");
+  delay(1000);
   
   
 }
 
 void loop() {
 
-  stateMachine();																			//Loop calls the state machine
+  stateMachine();                                     //Loop calls the state machine
   
   
 }
@@ -109,99 +110,102 @@ void stateMachine(){
   u32 code;
   switch(currentState){
     case st_IDLE:
-		if(modeSet == false){
-			currentState = st_setMode;
-			break;
-		}
-		if(machStr != store){
+    if(modeSet == false){
+      currentState = st_setMode;
+      lcd.clear();
+      lcd.print("Select Mode");
+      lcd.setCursor(0,1);
+      lcd.blink();
+      break;
+    }
+    if(machStr != store){
         
-			machStr = store;
-			Serial.println("CODE RECIEVED");
-			currentState = st_setMode;
-		}
+      machStr = store;
+      Serial.println("CODE RECIEVED");
+      currentState = st_setMode;
+    }
       ir();
       lightControl(lightMode);
       break;
-	case st_setMode:
-		modeSet = true;
-		lcd.print("Select Mode");
-		lcd.setCursor(0,1);
-		lcd.blink();
-		ir();
-		if(machStr != store){
+  case st_setMode:
+    modeSet = true;
+    
+    ir();
+    
         
-			machStr = store;
-			Serial.println("CODE RECIEVED");
-			
-			currentState = st_RECV;
-		}
-		currentState = st_IDLE;
-		break;
-    case st_RECV:
+      machStr = store;
+      Serial.println("CODE RECIEVED");
+      
       if(store == ONE){
         Serial.println("CHANGE");
         currentState = st_ONE;
+        break;
       }
       else if(store == TWO){
         Serial.println("CHANGE");
         currentState = st_TWO;
+        break;
       }
       else if(store == THREE){
         Serial.println("CHANGE");
         currentState = st_THREE;
+        break;
       }
       else if(store == FOUR){
         Serial.println("CHANGE");
         currentState = st_FOUR;
+        break;
       }
       else if(store == FIVE){
         Serial.println("CHANGE");
         currentState = st_FIVE;
+        break;
       }
       else if(store == SIX){
         Serial.println("CHANGE");
         currentState = st_SIX;
+        break;
       }
     else {
     Serial.println("Bad Code");
-    currentState = st_IDLE;
+    //currentState = st_IDLE;
+    break;
     }
-      break;
     case st_ONE: 
       Serial.println("STATE ONE");
       lightMode = 1;
     
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
     case st_TWO: 
       Serial.println("STATE TWO");
       lightMode = 2;
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
     case st_THREE: 
       Serial.println("STATE THREE");
       lightMode = 3;
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
     case st_FOUR: 
       Serial.println("STATE FOUR");
       lightMode = 4;
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
     case st_FIVE: 
       Serial.println("STATE FIVE");
       lightMode = 5;
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
     case st_SIX: 
       Serial.println("STATE SIX");
       lightMode = 6;
-      //lightControl(lightMode);
+      lightControl(lightMode);
       currentState = st_IDLE;
       break;
   }
