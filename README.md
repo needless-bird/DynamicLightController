@@ -1,6 +1,6 @@
 # DynamicLightController
 ## Features:
-1. State Machine with Red, Green, Blue, Purple and Yellow color modes \n
+1. State Machine with Red, Green, Blue, Purple and Yellow color modes 
 2. IR Read and store
 3. LCD Printout (currently only for debugging)
 4. Serial printout (currently only for debugging)
