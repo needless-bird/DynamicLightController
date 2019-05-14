@@ -1,4 +1,4 @@
- /*
+  /*
  ****************************************
  Dynamic Light Controller
  Author: Connor J. Edling, CpE
@@ -10,6 +10,7 @@
  #include <IRremote.h>
  #include <LiquidCrystal.h>
  #include <string.h>
+
  //Define statements
  /*IR control codes*/
  #define UP 0xff629d
@@ -43,14 +44,37 @@
   bool machStart = true;                                  //State Machine startup variable, to be used later
   bool irRECV = false;                                    //IR interrupt flag, to be used later
   bool modeSet = false;                                   //Flag for startup
-  enum STATE {st_IDLE, st_RECV, st_ONE, st_TWO, st_THREE, st_FOUR, st_FIVE, st_SIX, st_setMode};    //State machine state declerations
+  enum STATE {st_IDLE, st_RECV,st_OFF, st_RED, st_GREEN, st_BLUE, st_PURPLE, st_YELLOW, st_SIX, st_setMode};    //State machine state declerations
   u32 store;                                        //IR code storage variable, used for state machine state change
   u32 machStr;                                        //State machine IR code comparasion variable, used for detecting change
   STATE currentState;                                   //Current State variable, used to control the state machine
   int lightMode = 0;                                    //Light Mode variable, used to control the lightControl subroutine
 //PWM Vals
   int curR, curG, curB;
+//Colors
+int black[3]  = { 0, 0, 0 };
+int white[3]  = { 100, 100, 100 };
+int red[3]    = { 100, 0, 0 };
+int green[3]  = { 0, 100, 0 };
+int blue[3]   = { 0, 0, 100 };
+int yellow[3] = { 40, 95, 0 };
+int dimWhite[3] = { 30, 30, 30 };
+// Set initial color
+int redVal = black[0];
+int grnVal = black[1]; 
+int bluVal = black[2];
 
+int wait = 10;      // 10ms internal crossFade delay; increase for slower fades
+int hold = 0;       // Optional hold when a color is complete, before the next crossFade
+int dbug = 1;      // DEBUG counter; if set to 1, will write values back via serial
+int loopCount = 60; // How often should DEBUG report?
+int repeat = 3;     // How many times should we loop before stopping? (0 for no stop)
+int j = 0;          // Loop counter for repeat
+
+// Initialize color variables
+int prevR = redVal;
+int prevG = grnVal;
+int prevB = bluVal;
 
 //Begin
 void setup() {
@@ -138,27 +162,27 @@ void stateMachine(){
       
       if(store == ONE){
         Serial.println("CHANGE");
-        currentState = st_ONE;
+        currentState = st_RED;
         break;
       }
       else if(store == TWO){
         Serial.println("CHANGE");
-        currentState = st_TWO;
+        currentState = st_GREEN;
         break;
       }
       else if(store == THREE){
         Serial.println("CHANGE");
-        currentState = st_THREE;
+        currentState = st_BLUE;
         break;
       }
       else if(store == FOUR){
         Serial.println("CHANGE");
-        currentState = st_FOUR;
+        currentState = st_PURPLE;
         break;
       }
       else if(store == FIVE){
         Serial.println("CHANGE");
-        currentState = st_FIVE;
+        currentState = st_YELLOW;
         break;
       }
       else if(store == SIX){
@@ -171,32 +195,32 @@ void stateMachine(){
     //currentState = st_IDLE;
     break;
     }
-    case st_ONE: 
+    case st_RED: 
       Serial.println("STATE ONE");
       lightMode = 1;
     
       lightControl(lightMode);
       currentState = st_IDLE;
       break;
-    case st_TWO: 
+    case st_GREEN: 
       Serial.println("STATE TWO");
       lightMode = 2;
       lightControl(lightMode);
       currentState = st_IDLE;
       break;
-    case st_THREE: 
+    case st_BLUE: 
       Serial.println("STATE THREE");
       lightMode = 3;
       lightControl(lightMode);
       currentState = st_IDLE;
       break;
-    case st_FOUR: 
+    case st_PURPLE: 
       Serial.println("STATE FOUR");
       lightMode = 4;
       lightControl(lightMode);
       currentState = st_IDLE;
       break;
-    case st_FIVE: 
+    case st_YELLOW: 
       Serial.println("STATE FIVE");
       lightMode = 5;
       lightControl(lightMode);
@@ -212,24 +236,10 @@ void stateMachine(){
 }
 
 void rgb(){
-  unsigned int rgbColour[3];
-  while(machStr == store){
-  rgbColour[0] = 255;
-  rgbColour[1] = 0;
-  rgbColour[2] = 0;
-  setColourRgb(rgbColour[0],rgbColour[1],rgbColour[2]);
-  for(int i = 0; i < 3; i++){
-      int j = 1 == 2? 0:i+1;
-        for(int k = 0; k < 255; k++){
-          
-          rgbColour[i]--;
-          rgbColour[j]++;
-
-          setColourRgb(rgbColour[0],rgbColour[1],rgbColour[2]);
-          delay(5);
-          ir();
-    }
-  }
+  while(1){
+  crossFade(red);
+  crossFade(green);
+  crossFade(blue);
   }
 }
 void setColourRgb(unsigned int red, unsigned int green, unsigned int blue) {
@@ -289,3 +299,84 @@ void lightControl(int mode){
   return;
   }
   
+int calculateStep(int prevValue, int endValue) {
+  int step = endValue - prevValue; // What's the overall gap?
+  if (step) {                      // If its non-zero, 
+    step = 1020/step;              //   divide by 1020
+  } 
+  return step;
+}
+
+/* The next function is calculateVal. When the loop value, i,
+*  reaches the step size appropriate for one of the
+*  colors, it increases or decreases the value of that color by 1. 
+*  (R, G, and B are each calculated separately.)
+*/
+
+int calculateVal(int step, int val, int i) {
+
+  if ((step) && i % step == 0) { // If step is non-zero and its time to change a value,
+    if (step > 0) {              //   increment the value if step is positive...
+      val += 1;           
+    } 
+    else if (step < 0) {         //   ...or decrement it if step is negative
+      val -= 1;
+    } 
+  }
+  // Defensive driving: make sure val stays in the range 0-255
+  if (val > 255) {
+    val = 255;
+  } 
+  else if (val < 0) {
+    val = 0;
+  }
+  return val;
+}
+
+/* crossFade() converts the percentage colors to a 
+*  0-255 range, then loops 1020 times, checking to see if  
+*  the value needs to be updated each time, then writing
+*  the color values to the correct pins.
+*/
+
+void crossFade(int color[3]) {
+  // Convert to 0-255
+  int R = (color[0] * 255) / 100;
+  int G = (color[1] * 255) / 100;
+  int B = (color[2] * 255) / 100;
+
+  int stepR = calculateStep(prevR, R);
+  int stepG = calculateStep(prevG, G); 
+  int stepB = calculateStep(prevB, B);
+
+  for (int i = 0; i <= 1020; i++) {
+    redVal = calculateVal(stepR, redVal, i);
+    grnVal = calculateVal(stepG, grnVal, i);
+    bluVal = calculateVal(stepB, bluVal, i);
+
+    analogWrite(redPin, redVal);   // Write current values to LED pins
+    analogWrite(greenPin, grnVal);      
+    analogWrite(bluePin, bluVal); 
+
+    delay(wait); // Pause for 'wait' milliseconds before resuming the loop
+
+//    if (dbug) { // If we want serial output, print it at the 
+//      if (i == 0 or i % loopCount == 0) { // beginning, and every loopCount times
+//        Serial.print("Loop/RGB: #");
+//        Serial.print(i);
+//        Serial.print(" | ");
+//        Serial.print(redVal);
+//        Serial.print(" / ");
+//        Serial.print(grnVal);
+//        Serial.print(" / ");  
+//        Serial.println(bluVal); 
+//      } 
+//      dbug += 1;
+//    }
+  }
+  // Update current values for next loop
+  prevR = redVal; 
+  prevG = grnVal; 
+  prevB = bluVal;
+  delay(hold); // Pause for optional 'wait' milliseconds before resuming the loop
+}
