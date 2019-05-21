@@ -1,4 +1,4 @@
-  /*
+ /*
  ****************************************
  Dynamic Light Controller
  Author: Connor J. Edling, CpE
@@ -28,6 +28,10 @@
  #define SEVEN 0xff42bd
  #define EIGHT 0xff4ab5
  #define NINE 0xff52ad
+ //menu
+ #define MENU_BOT 0
+ #define MENU_TOP 5
+ char menuL[6][10] = {"Off", "Red", "Green", "Blue", "Purple", "Yellow"};
 //PWM Pins
   const int redPin = 11;                                   //Red Pin
   const int greenPin = 10;                                  //Green Pin
@@ -44,11 +48,13 @@
   bool machStart = true;                                  //State Machine startup variable, to be used later
   bool irRECV = false;                                    //IR interrupt flag, to be used later
   bool modeSet = false;                                   //Flag for startup
-  enum STATE {st_IDLE, st_RECV,st_OFF, st_RED, st_GREEN, st_BLUE, st_PURPLE, st_YELLOW, st_SIX, st_setMode};    //State machine state declerations
+  enum STATE {st_idle, st_menuSel};//enum STATE {st_modeSet, st_RECV,st_OFF, st_RED, st_GREEN, st_BLUE, st_PURPLE, st_YELLOW, st_SIX, st_setMode};    //State machine state declerations
   u32 store;                                        //IR code storage variable, used for state machine state change
-  u32 machStr;                                        //State machine IR code comparasion variable, used for detecting change
+                                         //State machine IR code comparasion variable, used for detecting change
   STATE currentState;                                   //Current State variable, used to control the state machine
   int lightMode = 0;                                    //Light Mode variable, used to control the lightControl subroutine
+  const char* m_modeC;
+  int m_mode = 0;
 //PWM Vals
   int curR, curG, curB;
 //Colors
@@ -75,10 +81,11 @@ int j = 0;          // Loop counter for repeat
 int prevR = redVal;
 int prevG = grnVal;
 int prevB = bluVal;
-
+bool idle_print = true;
 //Begin
 void setup() {
-  
+  m_modeC = "Off"; //Initialize machine with lights off
+  m_mode = 0;    //set the machine mode to 0 (off)
   //initialize pins
   setColourRgb(0,0,0);                                    //Initialize the RGB LED to off
   Serial.begin(9600);                                   //Initialize serial connection
@@ -90,9 +97,9 @@ void setup() {
   lcd.print("Welcome");                                   //Print a welcome message when setup is complete
   lcd.setCursor(0,1);
   lcd.print("Setup Complete");
-  delay(1000);
-  
-  
+  delay(2000);
+  lcd.clear();
+  //Serial.println(LEFT, HEX);//debug
 }
 
 void loop() {
@@ -110,11 +117,11 @@ int ir(){
     Serial.println(results.value,HEX);
  
     //Serial.println(results.value,HEX);
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("CODE:");
-    lcd.setCursor(0,1);
-    lcd.print(results.value, HEX);
+//    lcd.clear();
+//    lcd.setCursor(0,0);
+//    lcd.print("CODE:");
+//    lcd.setCursor(0,1);
+//    lcd.print(results.value, HEX);
     }
 
     irrecv.resume();
@@ -129,11 +136,92 @@ void lcdPrint(STATE cur){
     lcd.setCursor(0,1);
     lcd.print(cur);
 }
+void stateMachine(){
+  
+  switch(currentState){
+    u32 machStr; 
+    case st_idle:  
+      u32 dir;
+      if(idle_print == true){
+      Serial.println("st_idle");
+      idle_print = false;
+      Serial.println(idle_print);
+      }
+      lcd.setCursor(0,0);
+      lcd.print("Select Mode");
+      lcd.setCursor(0,1);
+      lcd.print(m_modeC);
+      ir();
+      if(machStr != store){
+        store = 0x0;
+        machStr = store;
+        Serial.println("machStr !=");
+        
+      if((store == LEFT || store == RIGHT)){
+        Serial.println("dir detected");
+        currentState = st_menuSel;
+        
+        //currentState = st_setMode;
+        break;
+      }
+        ir();
+        //lightControl(lightMode);
+        
+      }
+      break;
+    case st_menuSel:
+          Serial.println("dir change");
+          if(store == LEFT){   
+            Serial.println("left");          
+            store = 0x0;
+            m_mode = menu(m_mode);
+            lightControl(m_mode);
+            currentState = st_idle;
+            idle_print = true;
+            break;
+          }
+          else if(store == RIGHT){       
+            Serial.println("right");      
+            store = 0x0;
+            m_mode = menu(m_mode);
+            lightControl(m_mode);
+            currentState = st_idle;
+            idle_print = true;
+            break;
+          }
+          break;
+  } 
+}
 
+int menu(int pointer){
+    if(store == LEFT){
+      if(pointer == MENU_BOT){
+        pointer = MENU_TOP;
+        m_modeC = menuL[pointer];
+      }
+      else{
+      pointer--;
+      m_modeC = menuL[pointer];
+      }
+    }
+    else if(store == RIGHT){             
+      
+      if(pointer == MENU_TOP){
+        pointer = MENU_BOT;
+        m_modeC = menuL[pointer];
+      }
+      else{
+      pointer++;
+      m_modeC = menuL[pointer];
+      }
+    }
+    return pointer;
+}
+/*
 void stateMachine(){
   u32 code;
   switch(currentState){
-    case st_IDLE:
+    case st_modeSet:
     if(modeSet == false){
       currentState = st_setMode;
       lcd.clear();
@@ -192,7 +280,7 @@ void stateMachine(){
       }
     else {
     Serial.println("Bad Code");
-    //currentState = st_IDLE;
+    //currentState = st_modeSet;
     break;
     }
     case st_RED: 
@@ -200,41 +288,41 @@ void stateMachine(){
       lightMode = 1;
     
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
     case st_GREEN: 
       Serial.println("STATE TWO");
       lightMode = 2;
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
     case st_BLUE: 
       Serial.println("STATE THREE");
       lightMode = 3;
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
     case st_PURPLE: 
       Serial.println("STATE FOUR");
       lightMode = 4;
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
     case st_YELLOW: 
       Serial.println("STATE FIVE");
       lightMode = 5;
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
     case st_SIX: 
       Serial.println("STATE SIX");
       lightMode = 6;
       lightControl(lightMode);
-      currentState = st_IDLE;
+      currentState = st_modeSet;
       break;
   }
 }
-
+*/
 void rgb(){
   while(1){
   crossFade(red);
