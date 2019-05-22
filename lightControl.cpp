@@ -30,14 +30,14 @@
  #define NINE 0xff52ad
  //menu
  #define MENU_BOT 0
- #define MENU_TOP 5
- char menuL[6][10] = {"Off", "Red", "Green", "Blue", "Purple", "Yellow"};
+ #define MENU_TOP 6
+ char menuL[7][10] = {"Off", "Red", "Green", "Blue", "Purple", "Yellow", "Rainbow"};
 //PWM Pins
   const int redPin = 11;                                   //Red Pin
   const int greenPin = 10;                                  //Green Pin
   const int bluePin = 9;                                  //Blue Pin
 //LCD
-  const int rs = 3, en = 8, d4 = 7, d5 = 6, d6 = 5, d7 = 4;                 //LCD Pin definitions. 
+  const int rs = 12, en = 8, d4 = 4, d5 = 5, d6 = 6, d7 = 7;                 //LCD Pin definitions. 
   LiquidCrystal lcd(rs, en, d4, d5, d6, d7);                        //Creates LCD device
 //ir 
   const int irR = 2;                                    //IR Recieve Pin
@@ -50,7 +50,7 @@
   bool modeSet = false;                                   //Flag for startup
   enum STATE {st_idle, st_menuSel};//enum STATE {st_modeSet, st_RECV,st_OFF, st_RED, st_GREEN, st_BLUE, st_PURPLE, st_YELLOW, st_SIX, st_setMode};    //State machine state declerations
   u32 store;                                        //IR code storage variable, used for state machine state change
-                                         //State machine IR code comparasion variable, used for detecting change
+  int arrow; //menu keys, L==Left R==Right                                       //State machine IR code comparasion variable, used for detecting change
   STATE currentState;                                   //Current State variable, used to control the state machine
   int lightMode = 0;                                    //Light Mode variable, used to control the lightControl subroutine
   const char* m_modeC;
@@ -84,6 +84,8 @@ int prevB = bluVal;
 bool idle_print = true;
 //Begin
 void setup() {
+  attachInterrupt(digitalPinToInterrupt(3), right, RISING);
+  attachInterrupt(digitalPinToInterrupt(2), left, RISING);
   m_modeC = "Off"; //Initialize machine with lights off
   m_mode = 0;    //set the machine mode to 0 (off)
   //initialize pins
@@ -107,6 +109,14 @@ void loop() {
   stateMachine();                                     //Loop calls the state machine
   
   
+}
+void right(){
+  currentState = st_menuSel;
+  arrow = 1;
+}
+void left(){
+  currentState = st_menuSel;
+  arrow = 2;
 }
 int ir(){
     
@@ -150,69 +160,81 @@ void stateMachine(){
       lcd.setCursor(0,0);
       lcd.print("Select Mode");
       lcd.setCursor(0,1);
+      
       lcd.print(m_modeC);
-      ir();
-      if(machStr != store){
-        store = 0x0;
-        machStr = store;
-        Serial.println("machStr !=");
-        
-      if((store == LEFT || store == RIGHT)){
-        Serial.println("dir detected");
-        currentState = st_menuSel;
-        
-        //currentState = st_setMode;
-        break;
-      }
-        ir();
-        //lightControl(lightMode);
-        
-      }
+//      ir(); //for ir menu control, needs fixing
+//      if(machStr != store){
+//        store = 0x0;
+//        machStr = store;
+//        Serial.println("machStr !=");
+//        
+//      if((store == LEFT || store == RIGHT)){
+//        Serial.println("dir detected");
+//        currentState = st_menuSel;
+//        
+//        //currentState = st_setMode;
+//        break;
+//      }
+//        ir();
+//        //lightControl(lightMode);
+//        
+//      }
       break;
     case st_menuSel:
+          
           Serial.println("dir change");
-          if(store == LEFT){   
+          Serial.println(arrow);
+          if(arrow == 2){ 
+            
             Serial.println("left");          
             store = 0x0;
             m_mode = menu(m_mode);
+            arrow = 0;  
             lightControl(m_mode);
             currentState = st_idle;
             idle_print = true;
             break;
           }
-          else if(store == RIGHT){       
+          else if(arrow == 1){     
+            
             Serial.println("right");      
             store = 0x0;
             m_mode = menu(m_mode);
+            arrow = 0;  
             lightControl(m_mode);
             currentState = st_idle;
             idle_print = true;
             break;
           }
+          currentState = st_idle;
           break;
   } 
 }
 
 int menu(int pointer){
-    if(store == LEFT){
+    if(arrow == 2){
       if(pointer == MENU_BOT){
         pointer = MENU_TOP;
         m_modeC = menuL[pointer];
+        lcd.clear();
       }
       else{
       pointer--;
       m_modeC = menuL[pointer];
+      lcd.clear();
       }
     }
-    else if(store == RIGHT){             
+    else if(arrow == 1){             
       
       if(pointer == MENU_TOP){
         pointer = MENU_BOT;
         m_modeC = menuL[pointer];
+        lcd.clear();
       }
       else{
       pointer++;
       m_modeC = menuL[pointer];
+      lcd.clear();
       }
     }
     return pointer;
@@ -324,11 +346,11 @@ void stateMachine(){
 }
 */
 void rgb(){
-  while(1){
+  
   crossFade(red);
   crossFade(green);
   crossFade(blue);
-  }
+  
 }
 void setColourRgb(unsigned int red, unsigned int green, unsigned int blue) {
   analogWrite(redPin, red);
