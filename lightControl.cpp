@@ -29,9 +29,10 @@
  #define EIGHT 0xff4ab5
  #define NINE 0xff52ad
  //menu
+ #define TOP_MES " R   G   B  MODE"
  #define MENU_BOT 0
  #define MENU_TOP 6
- char menuL[7][10] = {"Off", "Red", "Green", "Blue", "Purple", "Yellow", "Rainbow"};
+ char menuL[7][10] = {" Off", " Red", " Grn", "Blue", "Purp", "Yell", "Rain"};
 //PWM Pins
   const int redPin = 11;                                   //Red Pin
   const int greenPin = 10;                                  //Green Pin
@@ -55,6 +56,9 @@
   int lightMode = 0;                                    //Light Mode variable, used to control the lightControl subroutine
   const char* m_modeC;
   int m_mode = 0;
+  char BOT_MES[16];
+  unsigned int rgbColour[3];
+  bool intF = false;
 //PWM Vals
   int curR, curG, curB;
 //Colors
@@ -101,6 +105,8 @@ void setup() {
   lcd.print("Setup Complete");
   delay(2000);
   lcd.clear();
+  lcd.setCursor(0,0);
+  
   //Serial.println(LEFT, HEX);//debug
 }
 
@@ -111,10 +117,12 @@ void loop() {
   
 }
 void right(){
+  intF = true;
   currentState = st_menuSel;
   arrow = 1;
 }
 void left(){
+  intF = true;
   currentState = st_menuSel;
   arrow = 2;
 }
@@ -139,12 +147,12 @@ int ir(){
   }
   return 1;
 }
-void lcdPrint(STATE cur){
-    lcd.clear();
+void lcdPrint(){
+    snprintf (BOT_MES, 16, "%03d %03d %03d %s", rgbColour[0], rgbColour[1], rgbColour[2], m_modeC);
     lcd.setCursor(0,0);
-    lcd.print("State:");
+    lcd.print(TOP_MES);
     lcd.setCursor(0,1);
-    lcd.print(cur);
+    lcd.print(BOT_MES);
 }
 void stateMachine(){
   
@@ -157,9 +165,7 @@ void stateMachine(){
       idle_print = false;
       Serial.println(idle_print);
       }
-      lcd.setCursor(0,0);
-      lcd.print("Select Mode");
-      lcd.setCursor(0,1);
+      lcdPrint();
       
       lcd.print(m_modeC);
 //      ir(); //for ir menu control, needs fixing
@@ -181,7 +187,7 @@ void stateMachine(){
 //      }
       break;
     case st_menuSel:
-          
+          intF = false;
           Serial.println("dir change");
           Serial.println(arrow);
           if(arrow == 2){ 
@@ -239,112 +245,7 @@ int menu(int pointer){
     }
     return pointer;
 }
-/*
-void stateMachine(){
-  u32 code;
-  switch(currentState){
-    case st_modeSet:
-    if(modeSet == false){
-      currentState = st_setMode;
-      lcd.clear();
-      lcd.print("Select Mode");
-      lcd.setCursor(0,1);
-      lcd.blink();
-      break;
-    }
-    if(machStr != store){
-        
-      machStr = store;
-      Serial.println("CODE RECIEVED");
-      currentState = st_setMode;
-    }
-      ir();
-      lightControl(lightMode);
-      break;
-  case st_setMode:
-    modeSet = true;
-    
-    ir();
-    
-        
-      machStr = store;
-      Serial.println("CODE RECIEVED");
-      
-      if(store == ONE){
-        Serial.println("CHANGE");
-        currentState = st_RED;
-        break;
-      }
-      else if(store == TWO){
-        Serial.println("CHANGE");
-        currentState = st_GREEN;
-        break;
-      }
-      else if(store == THREE){
-        Serial.println("CHANGE");
-        currentState = st_BLUE;
-        break;
-      }
-      else if(store == FOUR){
-        Serial.println("CHANGE");
-        currentState = st_PURPLE;
-        break;
-      }
-      else if(store == FIVE){
-        Serial.println("CHANGE");
-        currentState = st_YELLOW;
-        break;
-      }
-      else if(store == SIX){
-        Serial.println("CHANGE");
-        currentState = st_SIX;
-        break;
-      }
-    else {
-    Serial.println("Bad Code");
-    //currentState = st_modeSet;
-    break;
-    }
-    case st_RED: 
-      Serial.println("STATE ONE");
-      lightMode = 1;
-    
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-    case st_GREEN: 
-      Serial.println("STATE TWO");
-      lightMode = 2;
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-    case st_BLUE: 
-      Serial.println("STATE THREE");
-      lightMode = 3;
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-    case st_PURPLE: 
-      Serial.println("STATE FOUR");
-      lightMode = 4;
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-    case st_YELLOW: 
-      Serial.println("STATE FIVE");
-      lightMode = 5;
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-    case st_SIX: 
-      Serial.println("STATE SIX");
-      lightMode = 6;
-      lightControl(lightMode);
-      currentState = st_modeSet;
-      break;
-  }
-}
-*/
+
 void rgb(){
   
   crossFade(red);
@@ -358,7 +259,7 @@ void setColourRgb(unsigned int red, unsigned int green, unsigned int blue) {
   analogWrite(bluePin, blue);
 }
 void lightControl(int mode){
-  unsigned int rgbColour[3];
+
   //Begin off
 
   if(mode == 0){
@@ -404,7 +305,28 @@ void lightControl(int mode){
     return;
   }
   else if(mode == 6){
-      rgb();
+    rgbColour[0] = 255;
+    rgbColour[1] = 0;
+    rgbColour[2] = 0;
+    for (int decColour = 0; decColour < 3; decColour += 1) {
+    int incColour = (decColour + 1)%2;
+
+    // cross-fade the two colours.
+    for(int oj = 0; oj < 255; oj += 1) {
+      rgbColour[decColour] -= 1;
+      rgbColour[incColour] += 1;
+      
+      setColourRgb(rgbColour[0], rgbColour[1], rgbColour[2]);
+      if(intF == true){
+        intF == false;
+        
+        return;
+      }
+      //lcdPrint();
+     delay(5);
+    }
+    }
+    return;
   } 
   return;
   }
